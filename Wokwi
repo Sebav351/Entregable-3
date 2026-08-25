@@ -1,0 +1,99 @@
+import network
+import time
+import ustruct as struct
+import usocket as socket
+from machine import Pin
+
+PIN_LED = 25  
+led = Pin(PIN_LED, Pin.OUT)
+led.value(0)
+
+
+class MiniMQTT:
+    def __init__(self, client_id, server, port=1883):
+        self.client_id = client_id
+        self.server = server
+        self.port = port
+        self.sock = None
+        self.cb = None
+        self.pid = 0
+
+    def set_callback(self, f):
+        self.cb = f
+
+    def connect(self, clean_session=True):
+        self.sock = socket.socket()
+        self.sock.connect(socket.getaddrinfo(self.server, self.port)[0][-1])
+        msg = bytearray(b"\x10\0\0\x04MQTT\x04\x02\0\0")
+        msg[1] = 10 + 2 + len(self.client_id)
+        msg[9] = clean_session << 1
+        msg += struct.pack("!H", len(self.client_id)) + self.client_id.encode()
+        self.sock.write(msg)
+        resp = self.sock.read(4)
+        return resp[3] == 0
+
+    def subscribe(self, topic, qos=0):
+        self.pid += 1
+        msg = bytearray(b"\x82\0\0\0")
+        msg[1] = 2 + 2 + len(topic) + 1
+        struct.pack_into("!H", msg, 2, self.pid)
+        msg += struct.pack("!H", len(topic)) + topic.encode() + bytearray([qos])
+        self.sock.write(msg)
+        self.sock.read(5)
+
+    def check_msg(self):
+        self.sock.setblocking(False)
+        try:
+            res = self.sock.read(1)
+        except:
+            return None
+        if not res:
+            return None
+        
+        self.sock.setblocking(True)
+        op = res[0]
+        if op & 0xf0 != 0x30:
+            return None
+        
+        sz = self.sock.read(1)[0]
+        tlen = struct.unpack("!H", self.sock.read(2))[0]
+        topic = self.sock.read(tlen)
+        sz -= (tlen + 2)
+        msg = self.sock.read(sz)
+        if self.cb:
+            self.cb(topic, msg)
+
+
+print("Conectando a Wi-Fi...")
+wlan = network.WLAN(network.STA_IF)
+wlan.active(True)
+wlan.connect("Wokwi-GUEST", "")
+while not wlan.isconnected():
+    time.sleep(0.1)
+print("Wi-Fi OK:", wlan.ifconfig()[0])
+
+def procesar_mensaje(topic, msg):
+    orden = msg.decode().strip()
+    print("Mensaje recibido de DeepSeek:", orden)
+
+    if orden == "LED_ON":
+        led.value(1)
+        print("LED Encendido!")
+    elif orden == "LED_OFF":
+        led.value(0)
+        print("LED Apagado!")
+
+
+TOPIC = "lab_micro_deepseek/led_unico"
+client = MiniMQTT("wokwi_single_led_node", "broker.hivemq.com")
+client.set_callback(procesar_mensaje)
+
+if client.connect():
+    print("Conectado a MQTT Broker!")
+    client.subscribe(TOPIC)
+    print("Escuchando en:", TOPIC)
+
+
+while True:
+    client.check_msg()
+    time.sleep(0.05)
