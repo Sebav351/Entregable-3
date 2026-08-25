@@ -6,7 +6,7 @@ import requests
 import sounddevice as sd
 import speech_recognition as sr
 
-# ================= Configuración Ollama Local =================
+
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODELO_LOCAL = "llama3.1:8b"
 
@@ -24,7 +24,7 @@ Reglas:
 - Si no tiene relación con luces -> comando: "NINGUNO"
 """
 
-# ================= Configuración MQTT =================
+
 MQTT_BROKER = "broker.hivemq.com"
 TOPIC_CONTROL = "lab_micro_deepseek/led_unico"
 
@@ -36,8 +36,6 @@ try:
 except Exception as e:
     print(f"Error conectando a MQTT: {e}")
 
-
-# ================= Inferencia con Llama 3.1:8b =================
 def consultar_llama(texto_usuario):
     payload = {
         "model": MODELO_LOCAL,
@@ -60,7 +58,7 @@ def consultar_llama(texto_usuario):
         return {"comando": "NINGUNO", "respuesta": "Error procesando orden."}
 
 
-# ================= Captura de Voz con Sounddevice =================
+
 def grabar_voz(duracion=4, sample_rate=16000):
     print("\n>> ESCUCHANDO... Habla ahora:")
     try:
@@ -85,7 +83,6 @@ def grabar_voz(duracion=4, sample_rate=16000):
         return None
 
 
-# ================= Bucle Principal =================
 def main():
     print(f"=== ASISTENTE DE VOZ CON {MODELO_LOCAL.upper()} LOCAL ===")
     print("Presiona [ENTER] para hablar. Di 'salir' para terminar.\n")
@@ -113,5 +110,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-#LLAMA SE CORRE EN LOCAL, ABRIR OLLAMA POR SI ACASO
